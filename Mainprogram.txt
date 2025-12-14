@@ -1,0 +1,159 @@
+#include <Servo.h>
+
+// ========= Pin Definitions =========
+
+// Ultrasonic Sensor
+#define TRIG_PIN 8
+#define ECHO_PIN 9
+
+// Motor A
+#define MOTOR_IN1 2
+#define MOTOR_IN2 3
+#define MOTOR_ENA 6   // PWM for Motor A
+
+// Motor B
+#define MOTOR_IN3 4
+#define MOTOR_IN4 5
+#define MOTOR_ENB 11  // PWM for Motor B
+
+// Servo
+#define SERVO_PIN 10
+
+// ========= Servo & Global Variables =========
+Servo myServo;
+int distance = 0;
+int speedVal = 180;   // Speed (0–255)
+
+unsigned long lastDistanceTime = 0;
+
+void setup() {
+  Serial.begin(9600);
+
+  // Motor pins
+  pinMode(MOTOR_IN1, OUTPUT);
+  pinMode(MOTOR_IN2, OUTPUT);
+  pinMode(MOTOR_IN3, OUTPUT);
+  pinMode(MOTOR_IN4, OUTPUT);
+  pinMode(MOTOR_ENA, OUTPUT);
+  pinMode(MOTOR_ENB, OUTPUT);
+
+  // Ultrasonic pins
+  pinMode(TRIG_PIN, OUTPUT);
+  pinMode(ECHO_PIN, INPUT);
+
+  // Servo
+  myServo.attach(SERVO_PIN);
+  myServo.write(110); // Center
+
+  // Initial stop
+  stopMotors();
+}
+
+void loop() {
+  unsigned long currentMillis = millis();
+
+  // Measure distance every 500ms
+  if (currentMillis - lastDistanceTime >= 500) {
+    lastDistanceTime = currentMillis;
+    distance = measureDistance();
+    Serial.print("Distance: ");
+    Serial.print(distance);
+    Serial.println(" cm");
+  }
+
+  if (distance > 0 && distance < 30) {
+    stopMotors();
+    avoidObstacle();
+  } else {
+    moveForward();
+  }
+}
+
+// ========= Obstacle Avoidance =========
+void avoidObstacle() {
+  int leftDistance, rightDistance;
+
+  // Look left
+  myServo.write(0);
+  delay(500);
+  leftDistance = measureDistance();
+
+  // Look right
+  myServo.write(180);
+  delay(500);
+  rightDistance = measureDistance();
+
+  // Center again
+  myServo.write(110);
+  delay(300);
+
+  // Decide turn direction
+  if (leftDistance > rightDistance) {
+    turnLeft();
+  } else {
+    turnRight();
+  }
+}
+
+// ========= Distance Measurement =========
+int measureDistance() {
+  digitalWrite(TRIG_PIN, LOW);
+  delayMicroseconds(2);
+  digitalWrite(TRIG_PIN, HIGH);
+  delayMicroseconds(10);
+  digitalWrite(TRIG_PIN, LOW);
+
+  long duration = pulseIn(ECHO_PIN, HIGH, 30000); // timeout: 30ms
+  int dist = duration * 0.034 / 2;
+
+  if (duration == 0) return -1; // No echo
+  return dist;
+}
+
+// ========= Movement Functions =========
+void moveForward() {
+  digitalWrite(MOTOR_IN1, HIGH);
+  digitalWrite(MOTOR_IN2, LOW);
+  digitalWrite(MOTOR_IN3, HIGH);
+  digitalWrite(MOTOR_IN4, LOW);
+  analogWrite(MOTOR_ENA, speedVal);
+  analogWrite(MOTOR_ENB, speedVal);
+}
+
+void moveBackward() {
+  digitalWrite(MOTOR_IN1, LOW);
+  digitalWrite(MOTOR_IN2, HIGH);
+  digitalWrite(MOTOR_IN3, LOW);
+  digitalWrite(MOTOR_IN4, HIGH);
+  analogWrite(MOTOR_ENA, speedVal);
+  analogWrite(MOTOR_ENB, speedVal);
+}
+
+void turnLeft() {
+  digitalWrite(MOTOR_IN1, LOW);
+  digitalWrite(MOTOR_IN2, HIGH);
+  digitalWrite(MOTOR_IN3, HIGH);
+  digitalWrite(MOTOR_IN4, LOW);
+  analogWrite(MOTOR_ENA, speedVal);
+  analogWrite(MOTOR_ENB, speedVal);
+  delay(500);
+}
+
+void turnRight() {
+  digitalWrite(MOTOR_IN1, HIGH);
+  digitalWrite(MOTOR_IN2, LOW);
+  digitalWrite(MOTOR_IN3, LOW);
+  digitalWrite(MOTOR_IN4, HIGH);
+  analogWrite(MOTOR_ENA, speedVal);
+  analogWrite(MOTOR_ENB, speedVal);
+  delay(500);
+}
+
+void stopMotors() {
+  digitalWrite(MOTOR_IN1, LOW);
+  digitalWrite(MOTOR_IN2, LOW);
+  digitalWrite(MOTOR_IN3, LOW);
+  digitalWrite(MOTOR_IN4, LOW);
+  analogWrite(MOTOR_ENA, 0);
+  analogWrite(MOTOR_ENB, 0);
+}
